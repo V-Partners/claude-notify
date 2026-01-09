@@ -18,6 +18,13 @@ MAX_PORT=5099
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 
+# Detect OS
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    OS="macos"
+else
+    OS="linux"
+fi
+
 echo ""
 echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║       ${BOLD}Claude Notify Setup${NC}${CYAN}            ║${NC}"
@@ -33,7 +40,11 @@ check_command() {
 }
 
 is_port_in_use() {
-    lsof -i :"$1" >/dev/null 2>&1 || ss -tuln | grep -q ":$1 "
+    if [ "$OS" = "macos" ]; then
+        lsof -i :"$1" >/dev/null 2>&1
+    else
+        lsof -i :"$1" >/dev/null 2>&1 || ss -tuln 2>/dev/null | grep -q ":$1 "
+    fi
 }
 
 find_available_port() {
@@ -86,7 +97,11 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     print_error "Missing dependencies: ${MISSING_DEPS[*]}"
     echo ""
     echo "Install them with:"
-    echo "  sudo apt install ${MISSING_DEPS[*]}"
+    if [ "$OS" = "macos" ]; then
+        echo "  brew install ${MISSING_DEPS[*]}"
+    else
+        echo "  sudo apt install ${MISSING_DEPS[*]}"
+    fi
     exit 1
 fi
 
@@ -99,7 +114,11 @@ if ! check_command qrencode; then
 
     if [[ ! "$response" =~ ^[Nn] ]]; then
         echo "Installing qrencode..."
-        sudo apt install -y qrencode
+        if [ "$OS" = "macos" ]; then
+            brew install qrencode
+        else
+            sudo apt install -y qrencode
+        fi
         HAS_QRENCODE=true
         print_success "qrencode installed"
     else
@@ -126,7 +145,15 @@ if ! check_command tailscale; then
 
     if [[ ! "$response" =~ ^[Nn] ]]; then
         echo "Installing Tailscale..."
-        curl -fsSL https://tailscale.com/install.sh | sh
+        if [ "$OS" = "macos" ]; then
+            brew install --cask tailscale
+            echo ""
+            print_warning "Please open the Tailscale app from Applications to start it"
+            echo -n "Press Enter once Tailscale is running..."
+            read -r
+        else
+            curl -fsSL https://tailscale.com/install.sh | sh
+        fi
     else
         print_error "Tailscale is required for HTTPS (push notifications need HTTPS)"
         exit 1
@@ -223,15 +250,56 @@ fi
 print_success "Container running on port $SELECTED_PORT"
 
 # ============================================================
-# Step 6b: Install as systemd service
+# Step 6b: Install as system service (auto-start on boot)
 # ============================================================
 
-print_step "Setting up systemd service..."
+print_step "Setting up auto-start service..."
 
 SERVICE_NAME="claude-notify"
-SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-cat << EOF | sudo tee "$SERVICE_FILE" > /dev/null
+if [ "$OS" = "macos" ]; then
+    # macOS: Use launchd
+    PLIST_FILE="$HOME/Library/LaunchAgents/com.claude-notify.plist"
+    mkdir -p "$HOME/Library/LaunchAgents"
+
+    cat << EOF > "$PLIST_FILE"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.claude-notify</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/docker</string>
+        <string>compose</string>
+        <string>up</string>
+        <string>-d</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>$SCRIPT_DIR</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PORT</key>
+        <string>$SELECTED_PORT</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>
+EOF
+
+    launchctl unload "$PLIST_FILE" 2>/dev/null || true
+    launchctl load "$PLIST_FILE"
+
+    print_success "LaunchAgent installed (auto-starts on login)"
+else
+    # Linux: Use systemd
+    SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+
+    cat << EOF | sudo tee "$SERVICE_FILE" > /dev/null
 [Unit]
 Description=Claude Notify - Push notifications for Claude Code
 After=docker.service
@@ -250,10 +318,11 @@ TimeoutStartSec=0
 WantedBy=multi-user.target
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
+    sudo systemctl daemon-reload
+    sudo systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
 
-print_success "Systemd service installed (auto-starts on boot)"
+    print_success "Systemd service installed (auto-starts on boot)"
+fi
 
 # ============================================================
 # Step 7: Generate VAPID Keys
@@ -402,9 +471,15 @@ echo "  3. Add to Home Screen"
 echo "  4. Enable notifications"
 echo ""
 echo "Service management:"
-echo "  sudo systemctl stop claude-notify"
-echo "  sudo systemctl start claude-notify"
-echo "  sudo systemctl status claude-notify"
+if [ "$OS" = "macos" ]; then
+    echo "  launchctl stop com.claude-notify"
+    echo "  launchctl start com.claude-notify"
+    echo "  docker compose ps"
+else
+    echo "  sudo systemctl stop claude-notify"
+    echo "  sudo systemctl start claude-notify"
+    echo "  sudo systemctl status claude-notify"
+fi
 echo ""
 echo "View logs: docker compose logs -f"
 echo ""
