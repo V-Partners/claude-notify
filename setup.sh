@@ -359,17 +359,22 @@ print_step "Configuring Tailscale Funnel..."
 # Check if funnel is already configured for this port
 FUNNEL_STATUS=$(tailscale funnel status 2>/dev/null || echo "")
 
-if echo "$FUNNEL_STATUS" | grep -q ":$SELECTED_PORT"; then
+if echo "$FUNNEL_STATUS" | grep -q "localhost:$SELECTED_PORT"; then
     print_success "Tailscale Funnel already configured for port $SELECTED_PORT"
 else
     echo "  Enabling Funnel for port $SELECTED_PORT..."
-    # 'serve --funnel' configures persistent funnel (doesn't block)
-    if sudo tailscale serve --funnel --bg $SELECTED_PORT 2>/dev/null; then
+    # Reset any existing serve config first
+    sudo tailscale serve reset 2>/dev/null || true
+
+    # 'serve --funnel' maps external 443 to localhost:PORT
+    if sudo tailscale serve --bg --funnel 443 http://localhost:$SELECTED_PORT 2>/dev/null; then
         print_success "Tailscale Funnel enabled"
-    elif sudo tailscale serve --funnel $SELECTED_PORT 2>/dev/null; then
+    elif sudo tailscale serve --funnel 443 http://localhost:$SELECTED_PORT 2>/dev/null; then
+        print_success "Tailscale Funnel enabled"
+    elif sudo tailscale funnel 443 http://localhost:$SELECTED_PORT 2>/dev/null; then
         print_success "Tailscale Funnel enabled"
     else
-        # Older syntax - run in subshell, background it, and continue
+        # Oldest syntax
         print_warning "Using legacy funnel command..."
         (sudo tailscale funnel $SELECTED_PORT >/dev/null 2>&1 &)
         sleep 3
@@ -377,11 +382,8 @@ else
     fi
 fi
 
-# Build the full HTTPS URL
+# Build the full HTTPS URL (Funnel always serves on 443 externally)
 HTTPS_URL="https://${TAILSCALE_HOSTNAME}"
-if [ "$SELECTED_PORT" != "443" ]; then
-    HTTPS_URL="${HTTPS_URL}:${SELECTED_PORT}"
-fi
 
 print_success "HTTPS URL: $HTTPS_URL"
 
