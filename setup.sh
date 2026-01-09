@@ -270,11 +270,14 @@ else
     # Call the API to generate keys
     VAPID_RESPONSE=$(curl -s -X POST "http://localhost:$SELECTED_PORT/api/setup/generate-vapid")
 
-    if echo "$VAPID_RESPONSE" | jq -e '.success' >/dev/null 2>&1; then
+    if echo "$VAPID_RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
         print_success "VAPID keys generated"
     else
         print_error "Failed to generate VAPID keys"
-        echo "$VAPID_RESPONSE"
+        echo "  Response: $VAPID_RESPONSE"
+        echo ""
+        echo "  Container logs:"
+        docker compose logs --tail=10
     fi
 fi
 

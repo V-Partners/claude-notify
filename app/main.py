@@ -258,31 +258,40 @@ def setup_complete():
 @app.route('/api/setup/generate-vapid', methods=['POST'])
 def setup_generate_vapid():
     """Generate VAPID keys and save to .env file."""
-    keys = generate_vapid_keys()
+    try:
+        keys = generate_vapid_keys()
+        logger.info(f"Generated VAPID keys, public key: {keys['public_key'][:20]}...")
 
-    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+        env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+        logger.info(f"Writing VAPID keys to: {env_path}")
 
-    existing_lines = []
-    if os.path.exists(env_path):
-        with open(env_path, 'r') as f:
-            existing_lines = [
-                line for line in f.readlines()
-                if not line.startswith('VAPID_PRIVATE_KEY=')
-                and not line.startswith('VAPID_PUBLIC_KEY=')
-            ]
+        existing_lines = []
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                existing_lines = [
+                    line for line in f.readlines()
+                    if not line.startswith('VAPID_PRIVATE_KEY=')
+                    and not line.startswith('VAPID_PUBLIC_KEY=')
+                ]
 
-    with open(env_path, 'w') as f:
-        f.writelines(existing_lines)
-        f.write(f"\nVAPID_PRIVATE_KEY={keys['private_key']}\n")
-        f.write(f"VAPID_PUBLIC_KEY={keys['public_key']}\n")
+        with open(env_path, 'w') as f:
+            f.writelines(existing_lines)
+            f.write(f"\nVAPID_PRIVATE_KEY={keys['private_key']}\n")
+            f.write(f"VAPID_PUBLIC_KEY={keys['public_key']}\n")
 
-    os.environ['VAPID_PRIVATE_KEY'] = keys['private_key']
-    os.environ['VAPID_PUBLIC_KEY'] = keys['public_key']
+        os.environ['VAPID_PRIVATE_KEY'] = keys['private_key']
+        os.environ['VAPID_PUBLIC_KEY'] = keys['public_key']
 
-    return jsonify({
-        'success': True,
-        'public_key': keys['public_key']
-    })
+        return jsonify({
+            'success': True,
+            'public_key': keys['public_key']
+        })
+    except Exception as e:
+        logger.error(f"Failed to generate VAPID keys: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @app.route('/api/qrcode')
