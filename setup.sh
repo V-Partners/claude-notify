@@ -294,7 +294,7 @@ if echo "$FUNNEL_STATUS" | grep -q ":$SELECTED_PORT"; then
     print_success "Tailscale Funnel already configured for port $SELECTED_PORT"
 else
     echo "  Enabling Funnel for port $SELECTED_PORT..."
-    sudo tailscale funnel $SELECTED_PORT
+    sudo tailscale funnel --bg $SELECTED_PORT >/dev/null 2>&1
     print_success "Tailscale Funnel enabled"
 fi
 
