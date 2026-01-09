@@ -363,8 +363,18 @@ if echo "$FUNNEL_STATUS" | grep -q ":$SELECTED_PORT"; then
     print_success "Tailscale Funnel already configured for port $SELECTED_PORT"
 else
     echo "  Enabling Funnel for port $SELECTED_PORT..."
-    sudo tailscale funnel --bg $SELECTED_PORT >/dev/null 2>&1
-    print_success "Tailscale Funnel enabled"
+    # 'serve --funnel' configures persistent funnel (doesn't block)
+    if sudo tailscale serve --funnel --bg $SELECTED_PORT 2>/dev/null; then
+        print_success "Tailscale Funnel enabled"
+    elif sudo tailscale serve --funnel $SELECTED_PORT 2>/dev/null; then
+        print_success "Tailscale Funnel enabled"
+    else
+        # Older syntax - run in subshell, background it, and continue
+        print_warning "Using legacy funnel command..."
+        (sudo tailscale funnel $SELECTED_PORT >/dev/null 2>&1 &)
+        sleep 3
+        print_success "Tailscale Funnel enabled"
+    fi
 fi
 
 # Build the full HTTPS URL
