@@ -356,6 +356,17 @@ fi
 
 print_step "Configuring Tailscale Funnel..."
 
+# Function to enable funnel
+enable_funnel() {
+    # Reset any existing serve config first
+    sudo tailscale serve reset 2>/dev/null || true
+
+    # Try different syntaxes for different Tailscale versions
+    sudo tailscale serve --bg --funnel 443 http://localhost:$SELECTED_PORT 2>&1 || \
+    sudo tailscale serve --funnel 443 http://localhost:$SELECTED_PORT 2>&1 || \
+    sudo tailscale funnel 443 http://localhost:$SELECTED_PORT 2>&1
+}
+
 # Check if funnel is already configured for this port
 FUNNEL_STATUS=$(tailscale funnel status 2>/dev/null || echo "")
 
@@ -363,22 +374,40 @@ if echo "$FUNNEL_STATUS" | grep -q "localhost:$SELECTED_PORT"; then
     print_success "Tailscale Funnel already configured for port $SELECTED_PORT"
 else
     echo "  Enabling Funnel for port $SELECTED_PORT..."
-    # Reset any existing serve config first
-    sudo tailscale serve reset 2>/dev/null || true
 
-    # 'serve --funnel' maps external 443 to localhost:PORT
-    if sudo tailscale serve --bg --funnel 443 http://localhost:$SELECTED_PORT 2>/dev/null; then
-        print_success "Tailscale Funnel enabled"
-    elif sudo tailscale serve --funnel 443 http://localhost:$SELECTED_PORT 2>/dev/null; then
-        print_success "Tailscale Funnel enabled"
-    elif sudo tailscale funnel 443 http://localhost:$SELECTED_PORT 2>/dev/null; then
+    FUNNEL_OUTPUT=$(enable_funnel 2>&1)
+    FUNNEL_EXIT=$?
+
+    # Check if funnel is not enabled on the account
+    if echo "$FUNNEL_OUTPUT" | grep -qi "funnel not available\|not enabled\|enable funnel\|ACL\|policy"; then
+        echo ""
+        print_warning "Tailscale Funnel is not enabled on your account"
+        echo ""
+        echo -e "  ${BOLD}To enable Funnel:${NC}"
+        echo "  1. Open: https://login.tailscale.com/admin/acls"
+        echo "  2. Add this to your ACL policy:"
+        echo ""
+        echo -e "     ${CYAN}\"nodeAttrs\": [{\"target\": [\"*\"], \"attr\": [\"funnel\"]}]${NC}"
+        echo ""
+        echo "  Or for the new admin console, go to DNS settings and enable Funnel."
+        echo ""
+        echo -n "  Press Enter after enabling Funnel in admin console..."
+        read -r
+
+        # Retry
+        echo "  Retrying..."
+        FUNNEL_OUTPUT=$(enable_funnel 2>&1)
+        FUNNEL_EXIT=$?
+    fi
+
+    if [ $FUNNEL_EXIT -eq 0 ] || echo "$FUNNEL_OUTPUT" | grep -qi "available on the internet"; then
         print_success "Tailscale Funnel enabled"
     else
-        # Oldest syntax
-        print_warning "Using legacy funnel command..."
-        (sudo tailscale funnel $SELECTED_PORT >/dev/null 2>&1 &)
-        sleep 3
-        print_success "Tailscale Funnel enabled"
+        print_error "Failed to enable Funnel"
+        echo "  $FUNNEL_OUTPUT"
+        echo ""
+        echo "  You may need to enable Funnel manually:"
+        echo "  https://login.tailscale.com/admin/acls"
     fi
 fi
 
