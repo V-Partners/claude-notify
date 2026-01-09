@@ -93,8 +93,19 @@ fi
 # Check for qrencode (optional but recommended)
 if ! check_command qrencode; then
     print_warning "qrencode not found - QR code will not be displayed"
-    print_warning "Install with: sudo apt install qrencode"
-    HAS_QRENCODE=false
+    echo ""
+    echo -n "Install qrencode now? [Y/n] "
+    read -r response
+
+    if [[ ! "$response" =~ ^[Nn] ]]; then
+        echo "Installing qrencode..."
+        sudo apt install -y qrencode
+        HAS_QRENCODE=true
+        print_success "qrencode installed"
+    else
+        HAS_QRENCODE=false
+        print_warning "Skipping qrencode - you'll need to open the URL manually"
+    fi
 else
     HAS_QRENCODE=true
 fi
