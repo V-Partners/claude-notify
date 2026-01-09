@@ -141,17 +141,20 @@ VAPID_EMAIL=mailto:your-email@example.com
 3. Make sure Tailscale is connected on your phone
 4. Try the test button in the app
 
-### Container issues
+### Service management
 
 ```bash
-# View logs
-docker compose logs -f
+# Check status
+sudo systemctl status claude-notify
 
 # Restart
-docker compose down && PORT=5050 docker compose up -d
+sudo systemctl restart claude-notify
 
-# Rebuild
-docker compose up -d --build
+# Stop
+sudo systemctl stop claude-notify
+
+# View logs
+docker compose logs -f
 ```
 
 ### Tailscale Funnel

@@ -223,6 +223,39 @@ fi
 print_success "Container running on port $SELECTED_PORT"
 
 # ============================================================
+# Step 6b: Install as systemd service
+# ============================================================
+
+print_step "Setting up systemd service..."
+
+SERVICE_NAME="claude-notify"
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+
+cat << EOF | sudo tee "$SERVICE_FILE" > /dev/null
+[Unit]
+Description=Claude Notify - Push notifications for Claude Code
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=$SCRIPT_DIR
+Environment=PORT=$SELECTED_PORT
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
+
+print_success "Systemd service installed (auto-starts on boot)"
+
+# ============================================================
 # Step 7: Generate VAPID Keys
 # ============================================================
 
@@ -365,6 +398,10 @@ echo "  2. Install Tailscale app if prompted"
 echo "  3. Add to Home Screen"
 echo "  4. Enable notifications"
 echo ""
-echo "To stop: docker compose down"
-echo "To restart: PORT=$SELECTED_PORT docker compose up -d"
+echo "Service management:"
+echo "  sudo systemctl stop claude-notify"
+echo "  sudo systemctl start claude-notify"
+echo "  sudo systemctl status claude-notify"
+echo ""
+echo "View logs: docker compose logs -f"
 echo ""
