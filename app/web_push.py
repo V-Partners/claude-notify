@@ -9,7 +9,6 @@ import logging
 from typing import Optional
 
 from pywebpush import webpush, WebPushException
-from py_vapid import Vapid
 
 from app.database import Database
 
@@ -20,26 +19,53 @@ VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
 VAPID_EMAIL = os.environ.get('VAPID_EMAIL', 'mailto:admin@example.com')
 
 
+def get_vapid_private_key_pem() -> str:
+    """Convert stored key to PEM format for pywebpush."""
+    import base64
+    key = VAPID_PRIVATE_KEY
+    if not key:
+        return ''
+    # If already PEM, return as-is
+    if key.startswith('-----'):
+        return key
+    # Convert base64 DER to PEM
+    try:
+        der_bytes = base64.b64decode(key)
+        pem = '-----BEGIN PRIVATE KEY-----\n'
+        pem += base64.b64encode(der_bytes).decode('utf-8')
+        pem += '\n-----END PRIVATE KEY-----'
+        return pem
+    except Exception:
+        return key
+
+
 def generate_vapid_keys() -> dict:
     """Generate a new VAPID key pair."""
     import base64
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.backends import default_backend
 
-    vapid = Vapid()
-    vapid.generate_keys()
+    # Generate EC key directly
+    private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
 
-    # Get private key as PEM
-    private_pem = vapid.private_pem().decode('utf-8')
+    # Get private key as DER format, base64 encoded (single line for .env compatibility)
+    private_der = private_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    private_key_b64 = base64.b64encode(private_der).decode('utf-8')
 
     # Get public key in uncompressed point format (for applicationServerKey)
-    public_key_bytes = vapid._private_key.public_key().public_bytes(
+    public_key_bytes = private_key.public_key().public_bytes(
         encoding=serialization.Encoding.X962,
         format=serialization.PublicFormat.UncompressedPoint
     )
     public_key_b64 = base64.urlsafe_b64encode(public_key_bytes).decode('utf-8').rstrip('=')
 
     return {
-        'private_key': private_pem,
+        'private_key': private_key_b64,
         'public_key': public_key_b64
     }
 
@@ -98,7 +124,7 @@ def send_push_notification(
         webpush(
             subscription_info=subscription_info,
             data=payload,
-            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_private_key=get_vapid_private_key_pem(),
             vapid_claims={"sub": VAPID_EMAIL}
         )
         logger.info(f"Push notification sent: {title}")
