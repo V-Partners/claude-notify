@@ -1,0 +1,12 @@
+services:
+  claude-notify:
+    build: .
+    container_name: claude-notify
+    ports:
+      - "${PORT:-5050}:5000"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - DB_PATH=/app/data/claude_notify.db
+    restart: unless-stopped

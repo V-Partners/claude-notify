@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Claude Notify - Phone Setup</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#030508">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #030508;
+            --surface: #0d1117;
+            --border: #21262d;
+            --text: #c9d1d9;
+            --text-dim: #8b949e;
+            --accent: #00e5ff;
+            --success: #3fb950;
+            --warning: #d29922;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            padding-top: env(safe-area-inset-top, 20px);
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+        }
+        .container {
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--accent);
+            text-align: center;
+        }
+        .subtitle {
+            color: var(--text-dim);
+            margin-bottom: 32px;
+            text-align: center;
+        }
+        .step {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .step.active { display: block; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+        .card h2 {
+            font-size: 20px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .card p {
+            color: var(--text-dim);
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: background 0.3s;
+        }
+        .dot.active { background: var(--accent); }
+        .dot.done { background: var(--success); }
+        button {
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        button:hover { opacity: 0.9; }
+        button:active { transform: scale(0.98); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .btn-row button { flex: 1; }
+        .instruction-step {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            align-items: flex-start;
+        }
+        .step-num {
+            background: var(--accent);
+            color: var(--bg);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .step-content {
+            flex: 1;
+            padding-top: 4px;
+        }
+        .step-content strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        .step-content small {
+            color: var(--text-dim);
+            font-size: 13px;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .status-badge.success {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--success);
+        }
+        .status-badge.warning {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--warning);
+        }
+        .hidden { display: none !important; }
+        .app-links {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0;
+        }
+        .app-link {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px;
+            background: var(--bg);
+            border-radius: 12px;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+            border: 1px solid var(--border);
+        }
+        .app-link:hover { background: var(--border); }
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(63, 185, 80, 0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 40px;
+        }
+        .desktop-notice {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .desktop-notice h2 {
+            margin-bottom: 16px;
+        }
+        .desktop-notice code {
+            display: block;
+            background: var(--bg);
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Claude Notify</h1>
+        <p class="subtitle">Phone Setup</p>
+
+        <!-- Desktop notice (shown if not on mobile) -->
+        <div class="card desktop-notice hidden" id="desktop-notice">
+            <h2>Run setup on desktop</h2>
+            <p>This page is for phone setup. On your desktop, run:</p>
+            <code>./setup.sh</code>
+            <p>Then scan the QR code with your phone.</p>
+        </div>
+
+        <!-- Mobile flow -->
+        <div id="mobile-flow">
+            <div class="step-indicator">
+                <div class="dot active" data-step="1"></div>
+                <div class="dot" data-step="2"></div>
+                <div class="dot" data-step="3"></div>
+            </div>
+
+            <!-- Step 1: Tailscale Check -->
+            <div class="step active" id="step1">
+                <div class="card">
+                    <h2>Install Tailscale</h2>
+
+                    <div id="tailscale-needed">
+                        <p>Tailscale connects your phone to your computer's network securely.</p>
+
+                        <div class="app-links">
+                            <a href="https://apps.apple.com/app/tailscale/id1470499037" class="app-link" target="_blank" id="ios-link">
+                                App Store
+                            </a>
+                            <a href="https://play.google.com/store/apps/details?id=com.tailscale.ipn" class="app-link" target="_blank" id="android-link">
+                                Play Store
+                            </a>
+                        </div>
+
+                        <p style="font-size: 14px;">Sign in with the same account you used on your computer.</p>
+                    </div>
+
+                    <div id="tailscale-connected" class="hidden" style="text-align: center;">
+                        <div class="success-icon">&#10003;</div>
+                        <span class="status-badge success">Connected via Tailscale</span>
+                        <p style="margin-top: 16px;">Your phone is on your Tailscale network.</p>
+                    </div>
+
+                    <button onclick="nextStep()" style="margin-top: 20px;">Continue</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Add to Home Screen -->
+            <div class="step" id="step2">
+                <div class="card">
+                    <h2>Add to Home Screen</h2>
+
+                    <div id="pwa-not-installed">
+                        <!-- iOS Instructions -->
+                        <div id="ios-instructions" class="hidden">
+                            <div class="instruction-step">
+                                <span class="step-num">1</span>
+                                <div class="step-content">
+                                    <strong>Tap Share</strong>
+                                    <small>The square with an arrow at the bottom of Safari</small>
+                                </div>
+                            </div>
+                            <div class="instruction-step">
+                                <span class="step-num">2</span>
+                                <div class="step-content">
+                                    <strong>Add to Home Screen</strong>
+                                    <small>Scroll down in the share menu</small>
+                                </div>
+                            </div>
+                            <div class="instruction-step">
+                                <span class="step-num">3</span>
+                                <div class="step-content">
+                                    <strong>Tap Add</strong>
+                                    <small>In the top right corner</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Android Instructions -->
+                        <div id="android-instructions" class="hidden">
+                            <div class="instruction-step">
+                                <span class="step-num">1</span>
+                                <div class="step-content">
+                                    <strong>Tap Menu</strong>
+                                    <small>Three dots in the top right of Chrome</small>
+                                </div>
+                            </div>
+                            <div class="instruction-step">
+                                <span class="step-num">2</span>
+                                <div class="step-content">
+                                    <strong>Add to Home screen</strong>
+                                    <small>Or "Install app" if available</small>
+                                </div>
+                            </div>
+                            <div class="instruction-step">
+                                <span class="step-num">3</span>
+                                <div class="step-content">
+                                    <strong>Tap Add</strong>
+                                    <small>Confirm the installation</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p style="text-align: center; color: var(--text-dim); font-size: 14px; margin-top: 8px;">
+                            After adding, open the app from your home screen.
+                        </p>
+                    </div>
+
+                    <div id="pwa-installed" class="hidden" style="text-align: center;">
+                        <div class="success-icon">&#10003;</div>
+                        <span class="status-badge success">App Installed</span>
+                    </div>
+
+                    <div class="btn-row">
+                        <button class="secondary" onclick="prevStep()">Back</button>
+                        <button onclick="nextStep()">Continue</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Enable Notifications -->
+            <div class="step" id="step3">
+                <div class="card">
+                    <h2>Enable Notifications</h2>
+
+                    <div id="not-pwa" class="hidden">
+                        <p class="warning" style="background: rgba(210, 153, 34, 0.15); padding: 12px; border-radius: 8px; color: var(--warning);">
+                            Open this app from your Home Screen first to enable notifications.
+                        </p>
+                    </div>
+
+                    <div id="not-https" class="hidden">
+                        <p style="background: rgba(248, 81, 73, 0.15); padding: 12px; border-radius: 8px; color: #f85149;">
+                            HTTPS required. Make sure you're connected via Tailscale.
+                        </p>
+                    </div>
+
+                    <div id="notification-setup">
+                        <p>Tap the button below to enable push notifications:</p>
+
+                        <button id="enable-btn" onclick="enableNotifications()" style="margin: 20px 0;">
+                            Enable Notifications
+                        </button>
+
+                        <div id="notification-enabled" class="hidden" style="text-align: center;">
+                            <span class="status-badge success">Notifications Enabled!</span>
+                        </div>
+
+                        <div id="test-section" class="hidden">
+                            <p style="margin-top: 20px;">Test to make sure it works:</p>
+                            <button class="secondary" onclick="sendTest()">Send Test Notification</button>
+                        </div>
+                    </div>
+
+                    <div class="btn-row" style="margin-top: 24px;">
+                        <button class="secondary" onclick="prevStep()">Back</button>
+                        <button onclick="completeSetup()">Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        const totalSteps = 3;
+        let swRegistration = null;
+
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        const isMobile = isIOS || isAndroid;
+        const isPWA = window.matchMedia('(display-mode: standalone)').matches
+                   || window.navigator.standalone === true;
+        const isHTTPS = location.protocol === 'https:';
+
+        function init() {
+            if (!isMobile) {
+                document.getElementById('desktop-notice').classList.remove('hidden');
+                document.getElementById('mobile-flow').classList.add('hidden');
+                return;
+            }
+
+            if (isIOS) {
+                document.getElementById('ios-instructions').classList.remove('hidden');
+                document.getElementById('android-link').classList.add('hidden');
+            } else {
+                document.getElementById('android-instructions').classList.remove('hidden');
+                document.getElementById('ios-link').classList.add('hidden');
+            }
+
+            if (isHTTPS) {
+                document.getElementById('tailscale-needed').classList.add('hidden');
+                document.getElementById('tailscale-connected').classList.remove('hidden');
+            }
+
+            if (isPWA) {
+                document.getElementById('pwa-not-installed').classList.add('hidden');
+                document.getElementById('pwa-installed').classList.remove('hidden');
+            }
+
+            if (!isHTTPS) {
+                document.getElementById('notification-setup').classList.add('hidden');
+                document.getElementById('not-https').classList.remove('hidden');
+            } else if (!isPWA) {
+                document.getElementById('not-pwa').classList.remove('hidden');
+            }
+        }
+
+        function updateDots() {
+            document.querySelectorAll('.dot').forEach((dot, i) => {
+                dot.classList.remove('active', 'done');
+                if (i + 1 < currentStep) dot.classList.add('done');
+                if (i + 1 === currentStep) dot.classList.add('active');
+            });
+        }
+
+        function showStep(step) {
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById('step' + step).classList.add('active');
+            updateDots();
+        }
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                currentStep++;
+                showStep(currentStep);
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                showStep(currentStep);
+            }
+        }
+
+        async function enableNotifications() {
+            const btn = document.getElementById('enable-btn');
+            btn.disabled = true;
+            btn.textContent = 'Enabling...';
+
+            try {
+                swRegistration = await navigator.serviceWorker.register('/sw.js');
+
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    btn.textContent = 'Permission Denied';
+                    return;
+                }
+
+                const res = await fetch('/api/vapid-public-key');
+                const { publicKey } = await res.json();
+
+                const subscription = await swRegistration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicKey)
+                });
+
+                await fetch('/api/push/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(subscription.toJSON())
+                });
+
+                document.getElementById('notification-enabled').classList.remove('hidden');
+                document.getElementById('test-section').classList.remove('hidden');
+                btn.textContent = 'Enabled!';
+                btn.classList.add('secondary');
+
+            } catch (e) {
+                console.error('Failed:', e);
+                btn.textContent = 'Error - Try Again';
+                btn.disabled = false;
+            }
+        }
+
+        async function sendTest() {
+            try {
+                await fetch('/api/push/test', { method: 'POST' });
+            } catch (e) {
+                console.error('Test failed:', e);
+            }
+        }
+
+        async function completeSetup() {
+            try {
+                await fetch('/api/setup/complete', { method: 'POST' });
+            } catch (e) {
+                console.error('Complete failed:', e);
+            }
+            location.href = '/';
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        init();
+    </script>
+</body>
+</html>
