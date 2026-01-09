@@ -22,11 +22,25 @@ VAPID_EMAIL = os.environ.get('VAPID_EMAIL', 'mailto:admin@example.com')
 
 def generate_vapid_keys() -> dict:
     """Generate a new VAPID key pair."""
+    import base64
+    from cryptography.hazmat.primitives import serialization
+
     vapid = Vapid()
     vapid.generate_keys()
+
+    # Get private key as PEM
+    private_pem = vapid.private_pem().decode('utf-8')
+
+    # Get public key in uncompressed point format (for applicationServerKey)
+    public_key_bytes = vapid._private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.X962,
+        format=serialization.PublicFormat.UncompressedPoint
+    )
+    public_key_b64 = base64.urlsafe_b64encode(public_key_bytes).decode('utf-8').rstrip('=')
+
     return {
-        'private_key': vapid.private_pem().decode('utf-8'),
-        'public_key': vapid.public_key_urlsafe_base64()
+        'private_key': private_pem,
+        'public_key': public_key_b64
     }
 
 
