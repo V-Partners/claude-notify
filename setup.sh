@@ -356,15 +356,21 @@ fi
 
 print_step "Configuring Tailscale Funnel..."
 
-# Function to enable funnel
+# Function to enable funnel (returns 0 on success, 1 on failure)
 enable_funnel() {
     # Reset any existing serve config first
     sudo tailscale serve reset 2>/dev/null || true
 
     # Try different syntaxes for different Tailscale versions
-    sudo tailscale serve --bg --funnel 443 http://localhost:$SELECTED_PORT 2>&1 || \
-    sudo tailscale serve --funnel 443 http://localhost:$SELECTED_PORT 2>&1 || \
-    sudo tailscale funnel 443 http://localhost:$SELECTED_PORT 2>&1
+    if sudo tailscale serve --bg --funnel 443 http://localhost:$SELECTED_PORT 2>&1; then
+        return 0
+    elif sudo tailscale serve --funnel 443 http://localhost:$SELECTED_PORT 2>&1; then
+        return 0
+    elif sudo tailscale funnel 443 http://localhost:$SELECTED_PORT 2>&1; then
+        return 0
+    else
+        return 1
+    fi
 }
 
 # Check if funnel is already configured for this port
@@ -375,8 +381,11 @@ if echo "$FUNNEL_STATUS" | grep -q "localhost:$SELECTED_PORT"; then
 else
     echo "  Enabling Funnel for port $SELECTED_PORT..."
 
+    # Disable exit on error for this section
+    set +e
     FUNNEL_OUTPUT=$(enable_funnel 2>&1)
     FUNNEL_EXIT=$?
+    set -e
 
     # Check if funnel is not enabled on the account
     if echo "$FUNNEL_OUTPUT" | grep -qi "funnel not available\|not enabled\|enable funnel\|ACL\|policy"; then
@@ -396,18 +405,17 @@ else
 
         # Retry
         echo "  Retrying..."
+        set +e
         FUNNEL_OUTPUT=$(enable_funnel 2>&1)
         FUNNEL_EXIT=$?
+        set -e
     fi
 
     if [ $FUNNEL_EXIT -eq 0 ] || echo "$FUNNEL_OUTPUT" | grep -qi "available on the internet"; then
         print_success "Tailscale Funnel enabled"
     else
-        print_error "Failed to enable Funnel"
+        print_warning "Funnel setup had issues (may still work)"
         echo "  $FUNNEL_OUTPUT"
-        echo ""
-        echo "  You may need to enable Funnel manually:"
-        echo "  https://login.tailscale.com/admin/acls"
     fi
 fi
 
